@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="fa">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>بازی حافظه - نسخه خنده دار!</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@200;400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Cairo', sans-serif;
+            background: linear-gradient(45deg, #ff9a9e, #fad0c4, #fad0c4, #a1c4fd);
+            background-size: 400% 400%;
+            animation: gradientAnimation 15s ease infinite;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            overflow: hidden;
+        }
+
+        @keyframes gradientAnimation {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        .cp-container {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            display: flex;
+            align-items: center;
+            background: rgba(255, 255, 255, 0.8);
+            padding: 10px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        .game-board {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.8);
+            border-radius: 15px;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.2);
+        }
+        .card {
+            width: 100px;
+            height: 150px;
+            background-color: #fff;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            transform: perspective(600px);
+            transition: transform 0.6s, box-shadow 0.6s;
+            transform-style: preserve-3d;
+            border: 1px solid #000; /* اضافه کردن border */
+        }
+        .card.flipped {
+            transform: rotateY(180deg);
+        }
+        .card.matched {
+            box-shadow: 0 0 15px 5px rgba(255, 255, 255, 0.7);
+        }
+        .card-inner {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            transform-style: preserve-3d;
+            transition: transform 0.6s;
+        }
+        .card-front, .card-back {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            backface-visibility: hidden;
+            border-radius: 10px;
+        }
+        .card-front {
+            background-color: #fff;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-image: url('https://m.media-amazon.com/images/I/41n61ReptRL._BO30,255,255,255_UF900,850_SR1910,1000,0,C_QL100_.jpg');
+            background-size: cover;
+            background-position: center;
+        }
+        .card-back {
+            background-size: cover;
+            background-position: center;
+            transform: rotateY(180deg);
+        }
+        .confetti {
+            position: fixed;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 9999;
+        }
+
+        .congrats-message {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-family: 'Cairo', sans-serif;
+            font-size: 3em;
+            color: #ff7e5f;
+            background: rgba(255, 255, 255, 0.8);
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.2);
+            text-align: center;
+            display: none;
+            animation: fadeInScale 1s ease-in-out;
+        }
+
+        @keyframes fadeInScale {
+            0% { transform: translate(-50%, -50%) scale(0.5); opacity: 0; }
+            100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+    </div>
+    <div class="game-board" id="game-board">
+        <!-- کارت‌های بازی اینجا قرار می‌گیرند -->
+    </div>
+    <div class="congrats-message" id="congrats-message">خوب بود جناب انشتین</div>
+    <canvas id="confetti" class="confetti"></canvas>
+    <script>
+        let cpAmount = 0;
+
+        function updateCPAmount(amount) {
+            cpAmount += amount;
+            document.getElementById('cp-amount').innerText = `${cpAmount} CP`;
+            saveCPAmount(cpAmount);
+        }
+
+        function loadCPAmount() {
+            fetch('/get_cp_amount')
+                .then(response => response.json())
+                .then(data => {
+                    cpAmount = data.cp_amount;
+                    document.getElementById('cp-amount').innerText = `${cpAmount} CP`;
+                });
+        }
+
+        function saveCPAmount(amount) {
+            fetch('/save_cp_amount', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ cp_amount: amount })
+            });
+        }
+
+        const cards = [
+            { id: 1, color: '#28a745' }, // سبز
+            { id: 2, color: '#dc3545' }, // قرمز
+            { id: 3, color: '#ffc107' }, // زرد
+            { id: 4, color: '#6f42c1' }, // بنفش
+            { id: 5, color: '#007bff' }, // آبی
+            { id: 6, color: '#6c757d' }, // طوسی
+            { id: 7, color: '#fd7e14' }, // نارنجی (صورتی)
+            { id: 8, color: '#17a2b8' }, // آبی روشن
+            { id: 1, color: '#28a745' },
+            { id: 2, color: '#dc3545' },
+            { id: 3, color: '#ffc107' },
+            { id: 4, color: '#6f42c1' },
+            { id: 5, color: '#007bff' },
+            { id: 6, color: '#6c757d' },
+            { id: 7, color: '#fd7e14' },
+            { id: 8, color: '#17a2b8' }
+        ];
+
+        function shuffle(array) {
+            let currentIndex = array.length, temporaryValue, randomIndex;
+            while (0 !== currentIndex) {
+                randomIndex = Math.floor(Math.random() * currentIndex);
+                currentIndex -= 1;
+                temporaryValue = array[currentIndex];
+                array[currentIndex] = array[randomIndex];
+                array[randomIndex] = temporaryValue;
+            }
+            return array;
+        }
+
+        function createBoard() {
+            const board = document.getElementById('game-board');
+            const shuffledCards = shuffle(cards);
+            shuffledCards.forEach(card => {
+                const cardElement = document.createElement('div');
+                cardElement.classList.add('card');
+                cardElement.dataset.id = card.id;
+                cardElement.innerHTML = `
+                    <div class="card-inner">
+                        <div class="card-front" style="background-color: #fff"></div>
+                        <div class="card-back" style="background-color: ${card.color}"></div>
+                    </div>
+                `;
+                cardElement.addEventListener('click', flipCard);
+                board.appendChild(cardElement);
+            });
+        }
+
+        let hasFlippedCard = false;
+        let firstCard, secondCard;
+        let lockBoard = false;
+        let matchedPairs = 0;
+
+        function flipCard() {
+            if (lockBoard) return;
+            if (this === firstCard) return;
+
+            this.classList.add('flipped');
+
+            if (!hasFlippedCard) {
+                hasFlippedCard = true;
+                firstCard = this;
+                return;
+            }
+
+            secondCard = this;
+            checkForMatch();
+        }
+
+        function checkForMatch() {
+            const isMatch = firstCard.dataset.id === secondCard.dataset.id;
+            isMatch ? disableCards() : unflipCards();
+        }
+
+        function disableCards() {
+            firstCard.classList.add('matched');
+            secondCard.classList.add('matched');
+            firstCard.removeEventListener('click', flipCard);
+            secondCard.removeEventListener('click', flipCard);
+
+            matchedPairs++;
+            playPairMatchSound(); // پخش صدای موفقیت برای جفت کارت‌های درست
+
+            if (matchedPairs === cards.length / 2) {
+                setTimeout(() => {
+                    playSuccessSound();
+                    showConfetti();
+                    showCongratsMessage(); // نمایش پیام تبریک
+                    updateCPAmount(100); // بردن 100 CP برای بازی حافظه
+                }, 1000);
+            }
+
+            resetBoard();
+        }
+
+        function unflipCards() {
+            lockBoard = true;
+            setTimeout(() => {
+                firstCard.classList.remove('flipped');
+                secondCard.classList.remove('flipped');
+                resetBoard();
+            }, 1500);
+        }
+
+        function resetBoard() {
+            [hasFlippedCard, lockBoard] = [false, false];
+            [firstCard, secondCard] = [null, null];
+        }
+
+        function playPairMatchSound() {
+            let audio = new Audio('file:///C:/Users/sorou/Downloads/Hehe-Ha-Clash-Royale-Sound-Effect%20(1).mp3');
+            audio.play();
+        }
+
+        function playSuccessSound() {
+            let audio = new Audio('https://sedatoseda.com/wp-content/uploads/Angry_Birds_Bird-7.mp3');
+            audio.play();
+        }
+
+        function showConfetti() {
+            const canvas = document.getElementById('confetti');
+            const context = canvas.getContext('2d');
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+
+            const confettiPieces = [];
+            for (let i = 0; i < 500; i++) {
+                confettiPieces.push({
+                    x: Math.random() * canvas.width,
+                    y: Math.random() * canvas.height - canvas.height,
+                    size: Math.random() * 5 + 5,
+                    speedX: Math.random() - 0.5,
+                    speedY: Math.random() * 3 + 1,
+                    color: `hsl(${Math.random() * 360}, 100%, 50%)`
+                });
+            }
+
+            function updateConfetti() {
+                context.clearRect(0, 0, canvas.width, canvas.height);
+                confettiPieces.forEach((piece) => {
+                    piece.x += piece.speedX;
+                    piece.y += piece.speedY;
+
+                    if (piece.y > canvas.height) {
+                        piece.y = -piece.size;
+                    }
+
+                    context.beginPath();
+                    context.rect(piece.x, piece.y, piece.size, piece.size);
+                    context.fillStyle = piece.color;
+                    context.fill();
+                });
+
+                requestAnimationFrame(updateConfetti);
+            }
+
+            updateConfetti();
+        }
+
+        function showCongratsMessage() {
+            const congratsMessage = document.getElementById('congrats-message');
+            congratsMessage.style.display = 'block';
+        }
+
+        loadCPAmount();
+        createBoard();
+    </script>
+</body>
+</html>
